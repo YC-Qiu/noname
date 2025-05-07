@@ -1554,74 +1554,76 @@ game.import('extension', async function(lib, game, ui, get, ai, _status){
 						}
 					};
 
-					lib.element.content.chooseToGuanxing = function(){
-						"step 0"
-						if (player.isUnderControl()) {
-							game.modeSwapPlayer(player);
-						}
+					if (!_status.connectMode) {
+						lib.element.content.chooseToGuanxing = function(){
+							"step 0"
+							if (player.isUnderControl()) {
+								game.modeSwapPlayer(player);
+							}
 
-						var cards = get.cards(num);
-						var guanxing = decadeUI.content.chooseGuanXing(player, cards, cards.length, null, cards.length);
-						if (this.getParent() && this.getParent().name && get.translation(this.getParent().name) != this.getParent().name) {
-							guanxing.caption = '【' + get.translation(this.getParent().name) + '】';
-						} else {
-							guanxing.caption = "请按顺序排列牌。";
-						}
-						game.broadcast(function(player, cards, callback){
-							if (!window.decadeUI) return;
+							var cards = get.cards(num);
 							var guanxing = decadeUI.content.chooseGuanXing(player, cards, cards.length, null, cards.length);
-							guanxing.caption = '【观星】';
-							guanxing.callback = callback;
-						}, player, cards, guanxing.callback);
+							if (this.getParent() && this.getParent().name && get.translation(this.getParent().name) != this.getParent().name) {
+								guanxing.caption = '【' + get.translation(this.getParent().name) + '】';
+							} else {
+								guanxing.caption = "请按顺序排列牌。";
+							}
+							game.broadcast(function(player, cards, callback){
+								if (!window.decadeUI) return;
+								var guanxing = decadeUI.content.chooseGuanXing(player, cards, cards.length, null, cards.length);
+								guanxing.caption = '【观星】';
+								guanxing.callback = callback;
+							}, player, cards, guanxing.callback);
 
-						event.switchToAuto = function(){
-							var cards = guanxing.cards[0].concat();
-							var cheats = [];
-							var judges = player.node.judges.childNodes;
+							event.switchToAuto = function(){
+								var cards = guanxing.cards[0].concat();
+								var cheats = [];
+								var judges = player.node.judges.childNodes;
 
-							if (judges.length) cheats = decadeUI.get.cheatJudgeCards(cards, judges, true);
-							if (cards.length) {
-								for (var i = 0; i >= 0 && i < cards.length; i++) {
-									if (get.value(cards[i], player) >= 5) {
-										cheats.push(cards[i]);
-										cards.splice(i, 1)
+								if (judges.length) cheats = decadeUI.get.cheatJudgeCards(cards, judges, true);
+								if (cards.length) {
+									for (var i = 0; i >= 0 && i < cards.length; i++) {
+										if (get.value(cards[i], player) >= 5) {
+											cheats.push(cards[i]);
+											cards.splice(i, 1)
+										}
 									}
+								}
+
+								var time = 500;
+								for (var i = 0; i < cheats.length; i++) {
+									setTimeout(function(card, index, finished){
+										guanxing.move(card, index, 0);
+										if (finished) guanxing.finishTime(1000);
+									}, time, cheats[i], i, (i >= cheats.length - 1) && cards.length == 0);
+									time += 500;
+								}
+
+								for (var i = 0; i < cards.length; i++) {
+									setTimeout(function(card, index, finished){
+										guanxing.move(card, index, 1);
+										if (finished) guanxing.finishTime(1000);
+									}, time, cards[i], i, (i >= cards.length - 1));
+									time += 500;
 								}
 							}
 
-							var time = 500;
-							for (var i = 0; i < cheats.length; i++) {
-								setTimeout(function(card, index, finished){
-									guanxing.move(card, index, 0);
-									if (finished) guanxing.finishTime(1000);
-								}, time, cheats[i], i, (i >= cheats.length - 1) && cards.length == 0);
-								time += 500;
+							if (event.isOnline()) {
+								event.player.send(function(){
+									if (!window.decadeUI && decadeUI.eventDialog) _status.event.finish();
+								}, event.player);
+
+								event.player.wait();
+								decadeUI.game.wait();
+							} else if (!(typeof event.isMine == 'function' && event.isMine())) {
+								event.switchToAuto();
 							}
-
-							for (var i = 0; i < cards.length; i++) {
-								setTimeout(function(card, index, finished){
-									guanxing.move(card, index, 1);
-									if (finished) guanxing.finishTime(1000);
-								}, time, cards[i], i, (i >= cards.length - 1));
-								time += 500;
-							}
-						}
-
-						if (event.isOnline()) {
-							event.player.send(function(){
-								if (!window.decadeUI && decadeUI.eventDialog) _status.event.finish();
-							}, event.player);
-
-							event.player.wait();
-							decadeUI.game.wait();
-						} else if (!(typeof event.isMine == 'function' && event.isMine())) {
-							event.switchToAuto();
-						}
-						"step 1"
-						player.popup(get.cnNumber(event.num1) + '上' + get.cnNumber(event.num2) + '下');
-						game.log(player, '将' + get.cnNumber(event.num1) + '张牌置于牌堆顶，' + get.cnNumber(event.num2) +'张牌置于牌堆底');
-						game.updateRoundNumber()
-					};
+							"step 1"
+							player.popup(get.cnNumber(event.num1) + '上' + get.cnNumber(event.num2) + '下');
+							game.log(player, '将' + get.cnNumber(event.num1) + '张牌置于牌堆顶，' + get.cnNumber(event.num2) +'张牌置于牌堆底');
+							game.updateRoundNumber()
+						};
+					}
 
 					Mixin.replace(
 						'lib.element.content.respond',
@@ -4344,10 +4346,7 @@ game.import('extension', async function(lib, game, ui, get, ai, _status){
 						if (!node.node) {
 							node = [...ui.arena.childNodes].find(c => {
 								if (c.classList.contains("thrown") && c.classList.contains("card")) {
-									if (c._cardid == id && !c.selectedt) {
-										c.selectedt = true;
-										return true;
-									}
+									return c._cardid == id;
 								}
 							});
 						}
@@ -4391,16 +4390,6 @@ game.import('extension', async function(lib, game, ui, get, ai, _status){
 							}
 						case 'respond':
 							if (tagText == "") tagText = "打出";
-
-							var cardname = event.card.name;
-							var cardnature = event.card.nature;
-							if (lib.config.cardtempname != "off" && (card.name != cardname || !get.is.sameNature(cardnature, card.nature, true))) {
-								game.broadcastAll(function(event_card, card){
-									var node = ui.create.cardTempName(event_card, card);
-									var cardtempnameConfig = lib.config.cardtempname;
-									if (cardtempnameConfig !== "default") node.classList.remove("vertical");
-								}, event.card, card);
-							}
 							break;
 						case 'useskill':
 							tagText = "发动" + '<span style="color:#FFD700">' + get.skillTranslation(event.skill, event.player) + "</span>";
@@ -4494,10 +4483,7 @@ game.import('extension', async function(lib, game, ui, get, ai, _status){
 							if (!node.node) {
 								node = [...ui.arena.childNodes].find(c => {
 									if (c.classList.contains("thrown") && c.classList.contains("card")) {
-										if (c._cardid == id && !c.selected_spine) {
-											c.selected_spine = true;
-											return true;
-										}
+										return c._cardid == id;
 									}
 								});
 							}
@@ -4645,25 +4631,91 @@ game.import('extension', async function(lib, game, ui, get, ai, _status){
 									tagText = '判定<span class="firetext">失效</span>';
 								}
 	
-								if (apcard && apcard._ap) apcard._ap.stopSpineAll();
+								if (apcard && apcard._ap) {
+									apcard._ap.stopSpineAll();
+
+									game.broadcast(function (node, id) {
+										if (!window.decadeUI) return;
+										if (!node.node) {
+											node = [...ui.arena.childNodes].find(c => {
+												if (c.classList.contains("thrown") && c.classList.contains("card")) {
+													return c._cardid == id;
+												}
+											});
+										}
+										if (node == undefined || !node.node) return;
+										if (node && node._ap) node._ap.stopSpineAll();
+									}, apcard, apcard._cardid);
+								}
 								if (apcard && apcard._ap && apcard == card) {
 									apcard._ap.playSpine({
 										name: 'effect_panding',
 										action: action
 									});
+									game.broadcast(function (node, id, action) {
+										if (!window.decadeUI) return;
+										if (!node.node) {
+											node = [...ui.arena.childNodes].find(c => {
+												if (c.classList.contains("thrown") && c.classList.contains("card")) {
+													return c._cardid == id;
+												}
+											});
+										}
+										if (node == undefined || !node.node) return;
+										node._ap.playSpine({
+											name: 'effect_panding',
+											action: action
+										});
+									}, apcard, apcard._cardid, action);
 								} else {
 									decadeUI.animation.cap.playSpineTo(card, {
 										name: 'effect_panding',
 										action: action
 									});
+									game.broadcast(function (node, id, action) {
+										if (!window.decadeUI) return;
+										if (!node.node) {
+											node = [...ui.arena.childNodes].find(c => {
+												if (c.classList.contains("thrown") && c.classList.contains("card")) {
+													return c._cardid == id;
+												}
+											});
+										}
+										if (node == undefined || !node.node) return;
+										decadeUI.animation.cap.playSpineTo(node, {
+											name: 'effect_panding',
+											action: action
+										});
+									}, apcard, apcard._cardid, action);
 								}
 	
 								event.apcard = undefined;
-								tagNode.innerHTML = '<span style="font-weight:700"><span style="color:#FFD700">' + get.translation(event.judgestr) + "</span>" + tagText + "</span>";
+								let judge_innerHTML_str = '<span style="font-weight:700"><span style="color:#FFD700">' + get.translation(event.judgestr) + "</span>" + tagText + "</span>";
+								tagNode.innerHTML = judge_innerHTML_str;
+								game.broadcast(function (node, tag_innerHTML, id) {
+									if (!window.decadeUI) return;
+									if (!node.node) {
+										node = [...ui.arena.childNodes].find(c => {
+											if (c.classList.contains("thrown") && c.classList.contains("card")) {
+												return c._cardid == id;
+											}
+										});
+									}
+									if (node == undefined || !node.node) return;
+									var tagNode = node.querySelector('.used-info');
+									if (tagNode == null) tagNode = node.appendChild(dui.element.create('used-info'));
+									node.$usedtag = tagNode;
+									tagNode.innerHTML = tag_innerHTML;
+								}, card, judge_innerHTML_str, card._cardid);
 							});
 	
 							if (duicfg.cardUseEffect) {
 								decadeUI.animation.cap.playSpineTo(card, {
+									name: 'effect_panding',
+									action: 'play',
+									loop: true
+								});
+								animation_playSpineTo_Client(card, {
 									name: 'effect_panding',
 									action: 'play',
 									loop: true
